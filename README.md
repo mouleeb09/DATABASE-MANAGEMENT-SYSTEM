@@ -1,4 +1,4 @@
-# Radar-Based Human Detection Under Rubble
+#  Human Detection Under Rubble  using motion sensor
 
 Radar-Based Human Detection Under Rubble is an IoT-based rescue system using ESP32 and motion sensors to detect human presence in disaster areas. The system sends real-time data to a web dashboard and stores detection logs in a MySQL database for monitoring and analysis.
 
