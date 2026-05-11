@@ -1,0 +1,1491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32 Human Analysis Dashboard</title>
+  <script src="chart.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+      border-bottom: 3px solid #667eea;
+      padding-bottom: 20px;
+    }
+
+    .header h1 {
+      color: #333;
+      font-size: 2.5em;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      color: #666;
+      font-size: 1.1em;
+    }
+
+    .connection-section {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    button {
+      padding: 12px 30px;
+      font-size: 1em;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    #connectBtn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    #connectBtn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    #connectBtn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #disconnectBtn {
+      background: #e74c3c;
+      color: white;
+      display: none;
+    }
+
+    #disconnectBtn:hover:not(:disabled) {
+      background: #c0392b;
+      transform: translateY(-2px);
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 0.9em;
+      transition: all 0.3s ease;
+    }
+
+    .status-connected {
+      background: #2ecc71;
+      color: white;
+    }
+
+    .status-disconnected {
+      background: #95a5a6;
+      color: white;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 25px;
+      margin-top: 30px;
+    }
+
+    .status-card {
+      background: white;
+      border-radius: 15px;
+      padding: 30px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+      border-top: 5px solid #ccc;
+      text-align: center;
+    }
+
+    .status-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+    }
+
+    .status-card.motion-card {
+      border-top-color: #3498db;
+    }
+
+    .status-card.heat-card {
+      border-top-color: #e67e22;
+    }
+
+    .status-card.location-card {
+      border-top-color: #16a085;
+    }
+
+    .status-card.live-location-card {
+      border-top-color: #9b59b6;
+    }
+
+    .status-card.detection-card {
+      border-top-color: #e74c3c;
+      grid-column: 1 / -1;
+      max-width: 100%;
+    }
+
+    .card-title {
+      font-size: 1.2em;
+      color: #555;
+      margin-bottom: 15px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .card-icon {
+      font-size: 3em;
+      margin-bottom: 15px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.7;
+      }
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      margin-right: 10px;
+      animation: glow 2s infinite;
+    }
+
+    @keyframes glow {
+      0%, 100% {
+        box-shadow: 0 0 5px currentColor;
+      }
+      50% {
+        box-shadow: 0 0 15px currentColor;
+      }
+    }
+
+    .status-box {
+      background: #f8f9fa;
+      border-radius: 10px;
+      padding: 20px;
+      margin-top: 15px;
+      font-size: 1.3em;
+      font-weight: 600;
+    }
+
+    .status-box.on {
+      background: #d5f4e6;
+      color: #27ae60;
+      border: 2px solid #27ae60;
+    }
+
+    .status-box.off {
+      background: #fadbd8;
+      color: #c0392b;
+      border: 2px solid #c0392b;
+    }
+
+    .status-box.detected {
+      background: #fdebd0;
+      color: #d68910;
+      border: 2px solid #d68910;
+    }
+
+    .status-box.not-detected {
+      background: #fadbd8;
+      color: #c0392b;
+      border: 2px solid #c0392b;
+    }
+
+    .final-status {
+      font-size: 2em;
+      font-weight: 700;
+      padding: 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-radius: 10px;
+      margin-top: 15px;
+      transition: all 0.3s ease;
+    }
+
+    .final-status.detected {
+      background: linear-gradient(135deg, #27ae60 0%, #1e8449 100%);
+    }
+
+    .final-status.not-detected {
+      background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    }
+
+    .data-info {
+      font-size: 0.85em;
+      color: #999;
+      margin-top: 15px;
+      font-family: 'Courier New', monospace;
+      background: #f5f5f5;
+      padding: 10px;
+      border-radius: 5px;
+      word-break: break-all;
+    }
+
+    .debug-panel {
+      margin-top: 30px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      border-left: 4px solid #667eea;
+    }
+
+    .debug-panel h3 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    #debugOutput {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85em;
+      color: #666;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      background: #667eea;
+      border-radius: 50%;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .data-summary {
+      margin-top: 30px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      border-left: 4px solid #667eea;
+    }
+
+    .data-summary h3 {
+      color: #333;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .summary-table th,
+    .summary-table td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .summary-table th {
+      background: #667eea;
+      color: white;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .summary-table tr:nth-child(even) {
+      background: #f9f9f9;
+    }
+
+    .summary-table tr:hover {
+      background: #f0f0f0;
+    }
+
+    .status-value {
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+
+    .status-on { background: #d5f4e6; color: #27ae60; }
+    .status-off { background: #fadbd8; color: #c0392b; }
+    .status-detected { background: #fdebd0; color: #d68910; }
+    .status-not-detected { background: #fadbd8; color: #c0392b; }
+    .status-unknown { background: #ecf0f1; color: #7f8c8d; }
+
+    .charts-section {
+      margin-top: 30px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      border-left: 4px solid #3498db;
+    }
+
+    .charts-section h3 {
+      color: #333;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+
+    .charts-container {
+      display: flex;
+      justify-content: center;
+    }
+
+    .chart-wrapper {
+      background: white;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      max-width: 800px;
+      width: 100%;
+    }
+
+    .analysis-section {
+      margin-top: 30px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      border-left: 4px solid #9b59b6;
+    }
+
+    .analysis-section h3 {
+      color: #333;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .analysis-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .analysis-card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      transition: transform 0.3s ease;
+    }
+
+    .analysis-card:hover {
+      transform: translateY(-2px);
+    }
+
+    .analysis-title {
+      font-size: 0.9em;
+      color: #666;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .analysis-value {
+      font-size: 1.8em;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 5px;
+    }
+
+    .analysis-desc {
+      font-size: 0.8em;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🔍 ESP32 Human Analysis Dashboard</h1>
+      <p>Real-time Motion, Heat & Human Detection Analysis</p>
+    </div>
+
+    <div class="connection-section">
+      <button id="connectBtn" onclick="connectSerial()">
+        📡 Connect ESP32
+      </button>
+      <button id="disconnectBtn" onclick="disconnectSerial()">
+        ❌ Disconnect
+      </button>
+      <span class="status-badge status-disconnected" id="statusBadge">
+        <span class="loading"></span> Disconnected
+      </span>
+    </div>
+
+    <div class="dashboard">
+      <!-- Motion Status Card -->
+      <div class="status-card motion-card">
+        <div class="card-title">🚀 Motion Status</div>
+        <div class="card-icon">📍</div>
+        <div class="status-box" id="motionStatus" data-status="off">
+          <span class="status-indicator" id="motionIndicator"></span>
+          OFF
+        </div>
+        <div class="data-info">Latest: <span id="motionData">--</span></div>
+      </div>
+
+      <!-- Heat Status Card -->
+      <div class="status-card heat-card">
+        <div class="card-title">🔥 Heat Status</div>
+        <div class="card-icon">🌡️</div>
+        <div class="status-box" id="heatStatus" data-status="not-detected">
+          <span class="status-indicator" id="heatIndicator"></span>
+          NOT DETECTED
+        </div>
+        <div class="data-info">Latest: <span id="heatData">--</span></div>
+      </div>
+
+      <!-- Location Status Card -->
+      <div class="status-card location-card">
+        <div class="card-title">📍 Location / Heading</div>
+        <div class="card-icon">🧭</div>
+        <div class="status-box" id="locationStatus" data-status="unknown">
+          <span class="status-indicator" id="locationIndicator" style="background-color:#95a5a6"></span>
+          --, --
+        </div>
+        <div class="data-info">Latitude: <span id="latitudeData">--</span><br>Longitude: <span id="longitudeData">--</span><br>Heading: <span id="headingData">--</span></div>
+      </div>
+
+      <!-- Live Location Card -->
+      <div class="status-card live-location-card">
+        <div class="card-title">🌍 Live Location</div>
+        <div class="card-icon">📍</div>
+        <div class="status-box" id="liveLocationStatus" data-status="unknown">
+          <span class="status-indicator" id="liveLocationIndicator" style="background-color:#95a5a6"></span>
+          Fetching...
+        </div>
+        <div class="data-info">Latitude: <span id="liveLatitude">--</span><br>Longitude: <span id="liveLongitude">--</span></div>
+        <button id="getLocationBtn" onclick="getLocation()" style="margin-top: 10px; background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white;">📍 Get Location</button>
+      </div>
+
+      <!-- Final Detection Status Card -->
+      <div class="status-card detection-card">
+        <div class="card-title">👤 Living Person Detection</div>
+        <div class="card-icon">🎯</div>
+<div class="final-status not-detected" id="finalStatus">
+          🔴 NO PERSON DETECTED
+        </div>
+        <div class="manual-controls" style="margin-top: 15px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+          <button id="detectedBtn" onclick="togglePersonDetected(true)" style="background: linear-gradient(135deg, #27ae60 0%, #1e8449 100%); color: white;">🟢 Mark Detected</button>
+          <button id="notDetectedBtn" onclick="togglePersonDetected(false)" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white;">🔴 Mark Not Detected</button>
+          <button id="autoBtn" onclick="clearManualOverride()" style="background: #95a5a6; color: white;">🔄 Auto Mode</button>
+          <button id="triggerDetectBtn" onclick="triggerDetection()" style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); color: white;">🔍 Trigger Detection</button>
+        </div>
+        <div class="data-info">Latest update: <span id="lastUpdate">--</span></div>
+      </div>
+    </div>
+
+    <!-- Real-time Charts Section -->
+    <div class="charts-section">
+      <h3>📈 Real-time Sensor Data</h3>
+      <div class="charts-container">
+        <div class="chart-wrapper">
+          <canvas id="sensorChart" width="400" height="200"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analysis Section -->
+    <div class="analysis-section">
+      <h3>🧠 Human Detection Analysis</h3>
+      <div class="analysis-grid">
+        <div class="analysis-card">
+          <div class="analysis-title">Detection Confidence</div>
+          <div class="analysis-value" id="detectionConfidence">--%</div>
+          <div class="analysis-desc">Based on motion + heat correlation</div>
+        </div>
+        <div class="analysis-card">
+          <div class="analysis-title">Detection Rate</div>
+          <div class="analysis-value" id="detectionRate">--%</div>
+          <div class="analysis-desc">Last 10 detections</div>
+        </div>
+        <div class="analysis-card">
+          <div class="analysis-title">Average Temperature</div>
+          <div class="analysis-value" id="avgTemperature">--°C</div>
+          <div class="analysis-desc">Room temperature trend</div>
+        </div>
+        <div class="analysis-card">
+          <div class="analysis-title">Motion Frequency</div>
+          <div class="analysis-value" id="motionFrequency">--/min</div>
+          <div class="analysis-desc">Motion events per minute</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data Summary Section -->
+    <div class="data-summary">
+      <h3>📊 Current Data Summary</h3>
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th>Sensor</th>
+            <th>Status</th>
+            <th>Value</th>
+            <th>Last Update</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Motion</td>
+            <td><span id="summaryMotionStatus" class="status-value status-off">OFF</span></td>
+            <td id="summaryMotionValue">--</td>
+            <td id="summaryMotionTime">--</td>
+          </tr>
+          <tr>
+            <td>Heat</td>
+            <td><span id="summaryHeatStatus" class="status-value status-not-detected">NOT DETECTED</span></td>
+            <td id="summaryHeatValue">--</td>
+            <td id="summaryHeatTime">--</td>
+          </tr>
+          <tr>
+            <td>Location</td>
+            <td><span id="summaryLocationStatus" class="status-value status-unknown">UNKNOWN</span></td>
+            <td id="summaryLocationValue">--</td>
+            <td id="summaryLocationTime">--</td>
+          </tr>
+          <tr>
+            <td>Live Location</td>
+            <td><span id="summaryLiveLocationStatus" class="status-value status-unknown">UNKNOWN</span></td>
+            <td id="summaryLiveLocationValue">--</td>
+            <td id="summaryLiveLocationTime">--</td>
+          </tr>
+          <tr>
+            <td>Person Detection</td>
+            <td><span id="summaryDetectionStatus" class="status-value status-not-detected">NO PERSON</span></td>
+            <td id="summaryDetectionValue">--</td>
+            <td id="summaryDetectionTime">--</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Debug Panel -->
+    <div class="debug-panel">
+      <h3>📊 Debug Output</h3>
+      <div id="debugOutput">Waiting for connection...</div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      let port = null;
+      let reader = null;
+      let writer = null;
+      let isConnected = false;
+      let currentMotion = 'OFF';
+      let currentHeat = 'NOT_DETECTED';
+      let currentTemperature = '--';
+      let currentLatitude = '--';
+      let currentLongitude = '--';
+      let currentHeading = '--';
+      let liveLatitude = '--';
+      let liveLongitude = '--';
+      let manualOverride = false;
+      let manualPersonStatus = false;
+
+      // Analysis data
+      let sensorHistory = [];
+      let detectionHistory = [];
+      let temperatureHistory = [];
+      let motionEvents = [];
+      const maxHistory = 50;
+
+      // Python analysis integration
+      let analysisInterval;
+
+      // Fetch analysis data from Python server
+      const fetchAnalysisData = async () => {
+        try {
+          const response = await fetch('http://localhost:5000/api/analysis');
+          if (!response.ok) {
+            updateDebug('Python analysis server not available', 'info');
+            return;
+          }
+
+          const data = await response.json();
+          updateAnalysisFromPython(data);
+        } catch (error) {
+          // Silently fail if Python server is not running
+          console.debug('Python analysis fetch failed:', error.message);
+        }
+      };
+
+      // Update analysis display with Python data
+      const updateAnalysisFromPython = (data) => {
+        if (data.detection_confidence !== undefined) {
+          safeGet('detectionConfidence').textContent = `${data.detection_confidence}%`;
+        }
+        if (data.motion_heat_correlation !== undefined) {
+          // Could add correlation display if needed
+        }
+        if (data.temperature_trend) {
+          // Could add trend indicator
+        }
+        if (data.anomaly_score !== undefined) {
+          // Could add anomaly indicator
+        }
+        if (data.prediction_accuracy !== undefined) {
+          // Could add ML accuracy display
+        }
+      };
+
+      // Fetch stats from Python server
+      const fetchStatsData = async () => {
+        try {
+          const response = await fetch('http://localhost:5000/api/stats');
+          if (!response.ok) return;
+
+          const stats = await response.json();
+          updateStatsFromPython(stats);
+        } catch (error) {
+          console.debug('Python stats fetch failed:', error.message);
+        }
+      };
+
+      // Update stats display with Python data
+      const updateStatsFromPython = (stats) => {
+        if (stats.detection_accuracy !== undefined) {
+          safeGet('detectionRate').textContent = `${stats.detection_accuracy.toFixed(1)}%`;
+        }
+        if (stats.avg_temperature !== undefined) {
+          safeGet('avgTemperature').textContent = `${stats.avg_temperature.toFixed(1)}°C`;
+        }
+        if (stats.motion_rate !== undefined) {
+          safeGet('motionFrequency').textContent = `${stats.motion_rate.toFixed(1)}/min`;
+        }
+      };
+
+      // Chart.js setup
+      let sensorChart;
+      const initChart = () => {
+        const ctx = safeGet('sensorChart');
+        if (!ctx) return;
+
+        sensorChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [{
+              label: 'Motion (0/1)',
+              data: [],
+              borderColor: '#3498db',
+              backgroundColor: 'rgba(52, 152, 219, 0.1)',
+              tension: 0.4,
+              yAxisID: 'y'
+            }, {
+              label: 'Heat Detection (0/1)',
+              data: [],
+              borderColor: '#e67e22',
+              backgroundColor: 'rgba(230, 126, 34, 0.1)',
+              tension: 0.4,
+              yAxisID: 'y'
+            }, {
+              label: 'Temperature (°C)',
+              data: [],
+              borderColor: '#e74c3c',
+              backgroundColor: 'rgba(231, 76, 60, 0.1)',
+              tension: 0.4,
+              yAxisID: 'y1'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+              mode: 'index',
+              intersect: false,
+            },
+            plugins: {
+              title: {
+                display: true,
+                text: 'Real-time Sensor Data History'
+              },
+              legend: {
+                display: true,
+                position: 'top'
+              }
+            },
+            scales: {
+              x: {
+                display: true,
+                title: {
+                  display: true,
+                  text: 'Time'
+                }
+              },
+              y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                title: {
+                  display: true,
+                  text: 'Motion/Heat (0-1)'
+                },
+                min: 0,
+                max: 1,
+                ticks: {
+                  stepSize: 1
+                }
+              },
+              y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                title: {
+                  display: true,
+                  text: 'Temperature (°C)'
+                },
+                grid: {
+                  drawOnChartArea: false,
+                },
+              }
+            }
+          }
+        });
+      };
+
+      // Update chart with new data
+      const updateChart = () => {
+        if (!sensorChart) return;
+
+        const now = new Date().toLocaleTimeString();
+        sensorChart.data.labels.push(now);
+        sensorChart.data.datasets[0].data.push(currentMotion === 'ON' ? 1 : 0);
+        sensorChart.data.datasets[1].data.push(currentHeat === 'DETECTED' ? 1 : 0);
+        sensorChart.data.datasets[2].data.push(currentTemperature !== '--' ? parseFloat(currentTemperature) : null);
+
+        // Keep only last maxHistory points
+        if (sensorChart.data.labels.length > maxHistory) {
+          sensorChart.data.labels.shift();
+          sensorChart.data.datasets.forEach(dataset => dataset.data.shift());
+        }
+
+        sensorChart.update('none'); // Update without animation for real-time feel
+      };
+
+      // Update analysis metrics
+      const updateAnalysis = () => {
+        // Detection confidence (correlation between motion and heat)
+        const recentDetections = detectionHistory.slice(-10);
+        const confidence = recentDetections.length > 0 ?
+          Math.round((recentDetections.filter(d => d).length / recentDetections.length) * 100) : 0;
+        safeGet('detectionConfidence').textContent = `${confidence}%`;
+
+        // Detection rate (last 10 detections)
+        const detectionRate = recentDetections.length > 0 ?
+          Math.round((recentDetections.filter(d => d).length / recentDetections.length) * 100) : 0;
+        safeGet('detectionRate').textContent = `${detectionRate}%`;
+
+        // Average temperature
+        const recentTemps = temperatureHistory.slice(-10).filter(t => t !== '--');
+        const avgTemp = recentTemps.length > 0 ?
+          (recentTemps.reduce((a, b) => a + parseFloat(b), 0) / recentTemps.length).toFixed(1) : '--';
+        safeGet('avgTemperature').textContent = `${avgTemp}°C`;
+
+        // Motion frequency (events per minute)
+        const now = Date.now();
+        const recentMotion = motionEvents.filter(time => now - time < 60000); // Last minute
+        const frequency = recentMotion.length;
+        safeGet('motionFrequency').textContent = `${frequency}/min`;
+      };
+
+      const colorMap = {
+        on: '#27ae60',
+        off: '#e74c3c',
+        detected: '#f39c12',
+        'not-detected': '#e74c3c'
+      };
+
+      const safeGet = (id) => document.getElementById(id);
+
+      const updateDebug = (message, category = 'info') => {
+        const debugOutput = safeGet('debugOutput');
+        if (!debugOutput) return;
+        const timestamp = new Date().toLocaleTimeString();
+        const categoryIcon = {
+          'connection': '🔗',
+          'data': '📊',
+          'error': '❌',
+          'info': 'ℹ️'
+        }[category] || 'ℹ️';
+        const entry = `[${timestamp}] ${categoryIcon} ${message}`;
+        debugOutput.innerHTML = `${entry}<br>${debugOutput.innerHTML}`;
+
+        while (debugOutput.children.length > 30) {
+          debugOutput.removeChild(debugOutput.lastElementChild);
+        }
+        console.log(`[${category.toUpperCase()}] ${message}`);
+      };
+
+      const updateConnectionStatus = (connected) => {
+        isConnected = connected;
+        const badge = safeGet('statusBadge');
+        const connectBtn = safeGet('connectBtn');
+        const disconnectBtn = safeGet('disconnectBtn');
+
+        if (!badge || !connectBtn || !disconnectBtn) {
+          console.warn('Missing UI elements for connection status');
+          return;
+        }
+
+        if (connected) {
+          badge.className = 'status-badge status-connected';
+          badge.innerHTML = '<span class="loading"></span> Connected';
+          connectBtn.style.display = 'none';
+          disconnectBtn.style.display = 'inline-block';
+          updateDebug('Connected to ESP32', 'connection');
+        } else {
+          badge.className = 'status-badge status-disconnected';
+          badge.innerHTML = '<span class="loading"></span> Disconnected';
+          connectBtn.style.display = 'inline-block';
+          disconnectBtn.style.display = 'none';
+          updateDebug('Disconnected from ESP32', 'connection');
+        }
+      };
+
+      const updateFinalStatus = () => {
+        const finalStatus = safeGet('finalStatus');
+        const lastUpdate = safeGet('lastUpdate');
+        if (!finalStatus || !lastUpdate) return;
+
+        let personDetected;
+        if (manualOverride) {
+          personDetected = manualPersonStatus;
+          finalStatus.innerHTML = `${personDetected ? '🟢' : '🔴'} PERSON DETECTED <span style="font-size:0.6em; opacity:0.8;">(MANUAL)</span>`;
+        } else {
+          const motionOn = currentMotion === 'ON';
+          const heatDetected = currentHeat === 'DETECTED';
+          personDetected = motionOn && heatDetected;
+          finalStatus.innerHTML = personDetected ? '🟢 LIVING PERSON DETECTED' : '🔴 NO PERSON DETECTED';
+        }
+
+        finalStatus.className = `final-status ${personDetected ? 'detected' : 'not-detected'}`;
+        lastUpdate.textContent = new Date().toLocaleTimeString();
+
+        // Record detection for analysis
+        detectionHistory.push(personDetected);
+        if (detectionHistory.length > maxHistory) {
+          detectionHistory.shift();
+        }
+
+        // Update summary table
+        const summaryDetectionStatus = safeGet('summaryDetectionStatus');
+        const summaryDetectionValue = safeGet('summaryDetectionValue');
+        const summaryDetectionTime = safeGet('summaryDetectionTime');
+        if (summaryDetectionStatus && summaryDetectionValue && summaryDetectionTime) {
+          summaryDetectionStatus.className = `status-value ${personDetected ? 'status-detected' : 'status-not-detected'}`;
+          summaryDetectionStatus.textContent = personDetected ? 'DETECTED' : 'NO PERSON';
+          summaryDetectionValue.textContent = manualOverride ? (personDetected ? 'Manual override: Detected' : 'Manual override: Not detected') : (personDetected ? 'Living person present' : 'No detection');
+          summaryDetectionTime.textContent = new Date().toLocaleTimeString();
+        }
+
+        // Update button states
+        if (manualOverride) {
+          safeGet('detectedBtn').style.opacity = manualPersonStatus ? '0.6' : '1';
+          safeGet('notDetectedBtn').style.opacity = !manualPersonStatus ? '0.6' : '1';
+        } else {
+          safeGet('detectedBtn').style.opacity = '1';
+          safeGet('notDetectedBtn').style.opacity = '1';
+        }
+        safeGet('autoBtn').style.opacity = manualOverride ? '1' : '0.6';
+      };
+
+      const updateMotionStatus = (rawValue) => {
+        const motionStatus = safeGet('motionStatus');
+
+        const motionIndicator = safeGet('motionIndicator');
+        const motionData = safeGet('motionData');
+        if (!motionStatus || !motionIndicator || !motionData) {
+          console.warn('Motion status elements not found');
+          return;
+        }
+
+        const normalized = String(rawValue).trim().toUpperCase();
+        const isOn = ['ON', '1', 'TRUE'].includes(normalized);
+
+        currentMotion = isOn ? 'ON' : 'OFF';
+
+        motionStatus.className = `status-box ${isOn ? 'on' : 'off'}`;
+        motionIndicator.style.backgroundColor = colorMap[isOn ? 'on' : 'off'];
+        motionStatus.querySelector('span:last-child').textContent = isOn ? ' ON' : ' OFF';
+        motionData.textContent = rawValue;
+
+        // Update summary table
+        const summaryMotionStatus = safeGet('summaryMotionStatus');
+        const summaryMotionValue = safeGet('summaryMotionValue');
+        const summaryMotionTime = safeGet('summaryMotionTime');
+        if (summaryMotionStatus && summaryMotionValue && summaryMotionTime) {
+          summaryMotionStatus.className = `status-value ${isOn ? 'status-on' : 'status-off'}`;
+          summaryMotionStatus.textContent = isOn ? 'ON' : 'OFF';
+          summaryMotionValue.textContent = rawValue;
+          summaryMotionTime.textContent = new Date().toLocaleTimeString();
+        }
+
+        updateFinalStatus();
+        updateDebug(`Motion = ${currentMotion}`, 'data');
+
+        // Trigger location fetch on motion detection
+        if (isOn) {
+          getLocation();
+        }
+
+        // Record motion event for frequency analysis
+        if (isOn) {
+          motionEvents.push(Date.now());
+          // Keep only last 10 minutes of events
+          const tenMinutesAgo = Date.now() - 600000;
+          motionEvents = motionEvents.filter(time => time > tenMinutesAgo);
+        }
+
+        updateChart();
+        updateAnalysis();
+      };
+
+      // Geolocation functions
+      const getLocation = () => {
+        const liveLocationStatus = safeGet('liveLocationStatus');
+        const liveLocationIndicator = safeGet('liveLocationIndicator');
+        const liveLatitude = safeGet('liveLatitude');
+        const liveLongitude = safeGet('liveLongitude');
+
+        if (!navigator.geolocation) {
+          liveLocationStatus.textContent = 'Geolocation not supported';
+          liveLocationStatus.className = 'status-box not-detected';
+          liveLocationIndicator.style.backgroundColor = '#e74c3c';
+          updateDebug('Geolocation not supported', 'error');
+          return;
+        }
+
+        liveLocationStatus.textContent = 'Fetching location...';
+        liveLocationStatus.className = 'status-box detected';
+        liveLocationIndicator.style.backgroundColor = '#f39c12';
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+
+            liveLatitude.textContent = lat.toFixed(6);
+            liveLongitude.textContent = lng.toFixed(6);
+            liveLocationStatus.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            liveLocationStatus.className = 'status-box on';
+            liveLocationIndicator.style.backgroundColor = '#27ae60';
+
+            // Update summary table
+            const summaryLiveLocationStatus = safeGet('summaryLiveLocationStatus');
+            const summaryLiveLocationValue = safeGet('summaryLiveLocationValue');
+            const summaryLiveLocationTime = safeGet('summaryLiveLocationTime');
+            if (summaryLiveLocationStatus && summaryLiveLocationValue && summaryLiveLocationTime) {
+              summaryLiveLocationStatus.className = 'status-value status-on';
+              summaryLiveLocationStatus.textContent = 'FETCHED';
+              summaryLiveLocationValue.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+              summaryLiveLocationTime.textContent = new Date().toLocaleTimeString();
+            }
+          },
+          (error) => {
+            let errorMessage = 'Location access denied';
+            switch (error.code) {
+              case error.PERMISSION_DENIED:
+                errorMessage = 'Location access denied';
+                break;
+              case error.POSITION_UNAVAILABLE:
+                errorMessage = 'Location unavailable';
+                break;
+              case error.TIMEOUT:
+                errorMessage = 'Location request timeout';
+                break;
+              default:
+                errorMessage = 'Unknown location error';
+                break;
+            }
+            liveLocationStatus.textContent = errorMessage;
+            liveLocationStatus.className = 'status-box not-detected';
+            liveLocationIndicator.style.backgroundColor = '#e74c3c';
+
+            // Update summary table
+            const summaryLiveLocationStatus = safeGet('summaryLiveLocationStatus');
+            const summaryLiveLocationValue = safeGet('summaryLiveLocationValue');
+            const summaryLiveLocationTime = safeGet('summaryLiveLocationTime');
+            if (summaryLiveLocationStatus && summaryLiveLocationValue && summaryLiveLocationTime) {
+              summaryLiveLocationStatus.className = 'status-value status-not-detected';
+              summaryLiveLocationStatus.textContent = 'ERROR';
+              summaryLiveLocationValue.textContent = errorMessage;
+              summaryLiveLocationTime.textContent = new Date().toLocaleTimeString();
+            }
+
+            updateDebug(`Location error: ${errorMessage}`, 'error');
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 300000 // 5 minutes
+          }
+        );
+      };
+
+const temperatureThreshold = 25.0; // Celsius threshold for auto heat detection (lowered for indoor)
+
+      const updateHeatStatus = (rawValue, temperatureValue = null) => {
+        const heatStatus = safeGet('heatStatus');
+        const heatIndicator = safeGet('heatIndicator');
+        const heatData = safeGet('heatData');
+        if (!heatStatus || !heatIndicator || !heatData) {
+          console.warn('Heat status elements not found');
+          return;
+        }
+
+        const normalized = String(rawValue).trim().toUpperCase();
+        let isDetected = ['DETECTED', '1', 'TRUE'].includes(normalized);
+
+        if (temperatureValue !== null && temperatureValue !== undefined && !isNaN(Number(temperatureValue))) {
+          currentTemperature = Number(temperatureValue).toFixed(1);
+          if (!isDetected) {
+            isDetected = Number(currentTemperature) >= temperatureThreshold;
+          }
+        }
+
+        currentHeat = isDetected ? 'DETECTED' : 'NOT_DETECTED';
+
+        heatStatus.className = `status-box ${isDetected ? 'detected' : 'not-detected'}`;
+        heatIndicator.style.backgroundColor = colorMap[isDetected ? 'detected' : 'not-detected'];
+        heatStatus.querySelector('span:last-child').textContent = `${isDetected ? ' DETECTED' : ' NOT DETECTED'} (${currentTemperature}°C)`;
+        heatData.textContent = `${rawValue} | Temp ${currentTemperature}°C`;
+
+        // Update summary table
+        const summaryHeatStatus = safeGet('summaryHeatStatus');
+        const summaryHeatValue = safeGet('summaryHeatValue');
+        const summaryHeatTime = safeGet('summaryHeatTime');
+        if (summaryHeatStatus && summaryHeatValue && summaryHeatTime) {
+          summaryHeatStatus.className = `status-value ${isDetected ? 'status-detected' : 'status-not-detected'}`;
+          summaryHeatStatus.textContent = isDetected ? 'DETECTED' : 'NOT DETECTED';
+          summaryHeatValue.textContent = `${currentTemperature}°C`;
+          summaryHeatTime.textContent = new Date().toLocaleTimeString();
+        }
+
+        updateFinalStatus();
+        updateDebug(`Heat = ${currentHeat}, Temp = ${currentTemperature}°C`, 'data');
+
+        // Record temperature for analysis
+        if (currentTemperature !== '--') {
+          temperatureHistory.push(currentTemperature);
+          if (temperatureHistory.length > maxHistory) {
+            temperatureHistory.shift();
+          }
+        }
+
+        updateChart();
+        updateAnalysis();
+      };
+
+      const updateLocationStatus = (lat, lng, heading) => {
+        const locationStatus = safeGet('locationStatus');
+        const locationIndicator = safeGet('locationIndicator');
+        const latitudeData = safeGet('latitudeData');
+        const longitudeData = safeGet('longitudeData');
+        const headingData = safeGet('headingData');
+
+        if (!locationStatus || !locationIndicator || !latitudeData || !longitudeData || !headingData) {
+          console.warn('Location status elements not found');
+          return;
+        }
+
+        currentLatitude = lat !== undefined && lat !== null ? lat : currentLatitude;
+        currentLongitude = lng !== undefined && lng !== null ? lng : currentLongitude;
+        currentHeading = heading !== undefined && heading !== null ? heading : currentHeading;
+
+        locationStatus.className = 'status-box on';
+        locationIndicator.style.backgroundColor = '#16a085';
+        locationStatus.querySelector('span:last-child').textContent = `${currentLatitude}, ${currentLongitude}`;
+
+        latitudeData.textContent = currentLatitude;
+        longitudeData.textContent = currentLongitude;
+        headingData.textContent = currentHeading;
+
+        // Update summary table
+        const summaryLocationStatus = safeGet('summaryLocationStatus');
+        const summaryLocationValue = safeGet('summaryLocationValue');
+        const summaryLocationTime = safeGet('summaryLocationTime');
+        if (summaryLocationStatus && summaryLocationValue && summaryLocationTime) {
+          summaryLocationStatus.className = 'status-value status-on';
+          summaryLocationStatus.textContent = 'AVAILABLE';
+          summaryLocationValue.textContent = `${currentLatitude}, ${currentLongitude} (${currentHeading}°)`;
+          summaryLocationTime.textContent = new Date().toLocaleTimeString();
+        }
+
+        updateDebug(`Location = ${currentLatitude}, ${currentLongitude}, heading ${currentHeading}`, 'data');
+      };
+
+      const parseLine = (line) => {
+        const norm = line.trim();
+        if (!norm) return;
+
+        console.log(`Parsing line: "${norm}"`);
+
+        // Pattern 1: "Motion Detected" or "Motion Not Detected"
+        const simplePIRMatch = norm.match(/motion\s+(detected|not\s+detected)/i);
+        if (simplePIRMatch) {
+          const isDetected = /detected/.test(simplePIRMatch[0]) && !/not/.test(simplePIRMatch[0]);
+          const motionValue = isDetected ? 'ON' : 'OFF';
+          console.log(`[PIR] Motion: ${motionValue}`);
+          updateMotionStatus(motionValue);
+          return;
+        }
+
+        // Pattern 2: "Person Detected" or "No Person Detected"
+        const personMatch = norm.match(/(no\s+)?person\s+detected/i);
+        if (personMatch) {
+          const isDetected = !personMatch[1];
+          const motionValue = isDetected ? 'ON' : 'OFF';
+          console.log(`[Person Detection] ${norm} => ${motionValue}`);
+          updateMotionStatus(motionValue);
+          return;
+        }
+
+        // Pattern 3: Simple ON/OFF
+        const motionMatch = norm.match(/motion\s*[:=]\s*(on|off|1|0)/i);
+        if (motionMatch) {
+          const value = motionMatch[1].toUpperCase();
+          updateMotionStatus(value === '0' ? 'OFF' : value === '1' ? 'ON' : value);
+          console.log(`[Motion] ${motionMatch[1]} => ${value === '0' ? 'OFF' : value === '1' ? 'ON' : value}`);
+          return;
+        }
+
+        // Pattern 4: Heat/Temperature patterns
+        const heatMatch = norm.match(/heat[^a-zA-Z0-9]*[:=][^a-zA-Z0-9]*([0|1|true|false|detected|not[_ ]*detected|yes|no])/i);
+        const detectionMatch = norm.match(/(?:detection|result)\s*[:=]\s*(detected|not[_ ]*detected|yes|no|1|0)/i);
+        const tempMatch = norm.match(/temp(?:erature)?\s*[:=]\s*(-?\d+(?:\.\d+)?)/i);
+        const latMatch = norm.match(/lat(?:itude)?\s*[:=]\s*(-?\d+(?:\.\d+)?)/i);
+        const lngMatch = norm.match(/lon(?:g(?:itude)?)?\s*[:=]\s*(-?\d+(?:\.\d+)?)/i);
+        const headingMatch = norm.match(/heading\s*[:=]\s*(\d+(?:\.\d+)?)/i);
+
+        if (heatMatch) console.log(`[Heat] ${heatMatch[1]}`);
+        if (detectionMatch) console.log(`[Detection] ${detectionMatch[1]}`);
+        if (tempMatch) console.log(`[Temperature] ${tempMatch[1]}`);
+        if (latMatch) console.log(`[Latitude] ${latMatch[1]}`);
+        if (lngMatch) console.log(`[Longitude] ${lngMatch[1]}`);
+        if (headingMatch) console.log(`[Heading] ${headingMatch[1]}`);
+
+        const tempValue = tempMatch ? Number(tempMatch[1]) : null;
+
+        if (heatMatch || tempValue !== null) {
+          const heatValue = heatMatch ? heatMatch[1].toUpperCase().replace('_', '') : 'NOT_DETECTED';
+          updateHeatStatus(heatValue === '0' ? 'NOT_DETECTED' : heatValue === '1' ? 'DETECTED' : heatValue, tempValue);
+        }
+
+        if (detectionMatch) {
+          const detectionValue = detectionMatch[1].toUpperCase().replace('_', '');
+          const isDetected = ['DETECTED', 'YES', '1'].includes(detectionValue);
+          updateHeatStatus(isDetected ? 'DETECTED' : 'NOT_DETECTED', tempValue);
+          updateDebug(`Detection result: ${isDetected ? 'DETECTED' : 'NOT_DETECTED'}`, 'data');
+        }
+
+        const lat = latMatch ? latMatch[1] : null;
+        const lng = lngMatch ? lngMatch[1] : null;
+        const heading = headingMatch ? headingMatch[1] : null;
+
+        if (lat || lng || heading) {
+          updateLocationStatus(lat || currentLatitude, lng || currentLongitude, heading || currentHeading);
+        }
+      };
+
+      const connectSerial = async () => {
+        if (!('serial' in navigator)) {
+          updateDebug('❌ Web Serial API not supported in this browser', 'error');
+          alert('Web Serial API not supported.\nUse Chrome/Chromium-based browser (like Edge) v89+\nOr serve over HTTPS (localhost works)');
+          return;
+        }
+
+        try {
+          console.log('📡 Requesting serial port...');
+          updateDebug('Requesting serial port selection dialog...', 'connection');
+
+          // Attempt to request port - user must select a port
+          port = await navigator.serial.requestPort().catch((error) => {
+            if (error instanceof DOMException && error.name === 'NotFoundError') {
+              updateDebug('No ESP32 device found or permission denied', 'error');
+              alert('No serial port selected.\n\nPlease:\n1. Connect your ESP32 via USB\n2. Click Connect and select the port (COMx)\n3. Grant permission if prompted');
+              return null;
+            }
+            throw error;
+          });
+
+          // Check if user cancelled the port selection dialog
+          if (!port) {
+            updateDebug('Port selection cancelled by user', 'info');
+            console.log('Port selection was cancelled');
+            return;
+          }
+
+          console.log(`✅ Port selected. Opening at 115200 baud...`);
+          updateDebug('Opening serial port at 115200 baud...', 'connection');
+
+          await port.open({ baudRate: 115200 }).catch((error) => {
+            updateDebug(`❌ Failed to open port: ${error.message}`, 'error');
+            alert(`Failed to open port:\n${error.message}\n\nTry:\n1. Check USB connection\n2. Install CH340 drivers if needed\n3. Close other serial programs`);
+            throw error;
+          });
+
+          updateConnectionStatus(true);
+          console.log('✅ Serial connection established');
+
+          // Set up readable stream
+          const decoder = new TextDecoderStream();
+          const readerStream = port.readable;
+
+          if (!readerStream) {
+            throw new Error('Port readable stream is null');
+          }
+
+          readerStream.pipeTo(decoder.writable).catch((error) => {
+            console.error('Pipe error:', error);
+            updateDebug(`Pipe error: ${error.message}`, 'error');
+          });
+
+          reader = decoder.readable.getReader();
+          if (!reader) {
+            throw new Error('Failed to get reader from decoder stream');
+          }
+
+          // Set up writable stream for sending commands
+          const encoder = new TextEncoderStream();
+          const writerStream = port.writable;
+
+          if (!writerStream) {
+            throw new Error('Port writable stream is null');
+          }
+
+          writerStream.pipeTo(encoder.writable).catch((error) => {
+            console.error('Write pipe error:', error);
+          });
+
+          writer = encoder.writable.getWriter();
+          if (!writer) {
+            throw new Error('Failed to get writer from encoder stream');
+          }
+
+          updateDebug('✅ Streams ready. Listening for data...', 'connection');
+          console.log('✅ Ready to receive data');
+
+          let buffer = '';
+          let lastDataTime = Date.now();
+
+          // Read in loop
+          while (true) {
+            try {
+              const { value, done } = await reader.read();
+
+              if (done) {
+                console.log('Reader closed');
+                updateDebug('Serial reader closed', 'connection');
+                break;
+              }
+
+              if (!value) continue;
+
+              buffer += value;
+              lastDataTime = Date.now();
+
+              // Split by line breaks
+              const lines = buffer.split(/\r?\n/);
+              buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+              for (const rawLine of lines) {
+                const line = rawLine.trim();
+                if (!line) continue;
+
+                updateDebug(`📥 "${line}"`, 'data');
+                parseLine(line);
+              }
+            } catch (readError) {
+              if (readError.name === 'NotReadableError') {
+                console.log('Port was closed or disconnected');
+                updateDebug('Port disconnected', 'connection');
+              } else {
+                console.error('Read error:', readError);
+                updateDebug(`Read error: ${readError.message}`, 'error');
+              }
+              break;
+            }
+          }
+        } catch (error) {
+          console.error('Serial connection error:', error);
+          updateDebug(`❌ Serial error: ${error?.message || String(error)}`, 'error');
+          updateConnectionStatus(false);
+
+          // Clean up if connection failed
+          if (reader) {
+            await reader.cancel().catch(() => {});
+            reader = null;
+          }
+          if (writer) {
+            await writer.close().catch(() => {});
+            writer = null;
+          }
+          if (port) {
+            await port.close().catch(() => {});
+            port = null;
+          }
+        }
+      };
+
+      const disconnectSerial = async () => {
+        console.log('Disconnecting from ESP32...');
+        updateDebug('Disconnecting...', 'connection');
+
+        try {
+          if (reader) {
+            await reader.cancel().catch((e) => {
+              console.warn(`Error canceling reader: ${e?.message || e}`);
+            });
+            reader = null;
+          }
+
+          if (writer) {
+            try {
+              await writer.close();
+            } catch (e) {
+              console.warn(`Error closing writer: ${e?.message || e}`);
+            }
+            writer = null;
+          }
+
+          if (port) {
+            await port.close().catch((e) => {
+              console.warn(`Error closing port: ${e?.message || e}`);
+            });
+            port = null;
+          }
+
+          // Clear analysis interval
+          if (analysisInterval) {
+            clearInterval(analysisInterval);
+            analysisInterval = null;
+          }
+
+          updateConnectionStatus(false);
+          updateDebug('✅ Disconnected from ESP32', 'connection');
+        } catch (error) {
+          console.error('Error during disconnect:', error);
+          updateDebug(`Error during disconnect: ${error?.message || error}`, 'error');
+          updateConnectionStatus(false);
+        }
+      };
+
+      // Manual override functions
+      const togglePersonDetected = (detected) => {
+        manualOverride = true;
+        manualPersonStatus = detected;
+        localStorage.setItem('manualPersonStatus', detected);
+        updateFinalStatus();
+        updateDebug(`Manual override: ${detected ? 'DETECTED' : 'NOT DETECTED'}`, 'data');
+      };
+
+      const clearManualOverride = () => {
+        manualOverride = false;
+        manualPersonStatus = false;
+        localStorage.removeItem('manualPersonStatus');
+        updateFinalStatus();
+        updateDebug('Manual override cleared - back to auto mode', 'data');
+      };
+
+      const triggerDetection = async () => {
+        if (!isConnected || !writer) {
+          updateDebug('Cannot trigger detection: not connected to ESP32', 'error');
+          alert('Please connect to ESP32 first.');
+          return;
+        }
+
+        try {
+          const command = 'DETECT\n';
+          await writer.write(new TextEncoder().encode(command));
+          updateDebug(`Sent detection command: ${command.trim()}`, 'data');
+        } catch (error) {
+          updateDebug(`Error sending detection command: ${error?.message || error}`, 'error');
+        }
+      };
+
+      // Load manual override from localStorage on init
+      if (localStorage.getItem('manualPersonStatus') === 'true') {
+        manualOverride = true;
+        manualPersonStatus = true;
+      }
+
+      // Initialize Live Location status
+      const initLiveLocation = () => {
+        const liveLocationStatus = safeGet('liveLocationStatus');
+        const liveLocationIndicator = safeGet('liveLocationIndicator');
+        if (liveLocationStatus && liveLocationIndicator) {
+          liveLocationStatus.textContent = 'Not fetched';
+          liveLocationStatus.className = 'status-box not-detected';
+          liveLocationIndicator.style.backgroundColor = '#95a5a6';
+        }
+      };
+
+      // Expose functions to global scope for HTML onclick
+      window.getLocation = getLocation;
+
+      updateFinalStatus(); // Initial status
+      initChart(); // Initialize chart
+      initLiveLocation(); // Initialize live location
+      updateAnalysis(); // Initial analysis
+
+      // Start fetching Python analysis data
+      analysisInterval = setInterval(() => {
+        fetchAnalysisData();
+        fetchStatsData();
+      }, 2000); // Update every 2 seconds
+
+      updateDebug('Dashboard initialized and ready for connection', 'info');
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask API Test - Manual Sensor Data</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 2rem;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 0.5rem;
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
+
+        .section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .section h2 {
+            font-size: 1.1rem;
+            color: #333;
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 0.7rem;
+            margin-bottom: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 0.95rem;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        button {
+            flex: 1;
+            padding: 0.8rem;
+            border: none;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+
+        .btn-send {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-send:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-test {
+            background: #f0f0f0;
+            color: #333;
+            border: 2px solid #667eea;
+        }
+
+        .btn-test:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .status {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .response-box {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 1rem;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 1rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .preset-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .preset-btn {
+            padding: 0.5rem 1rem;
+            background: #e9ecef;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+        }
+
+        .preset-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1.5rem;
+            color: #0d47a1;
+            font-size: 0.9rem;
+        }
+
+        .info-box strong {
+            color: #1565c0;
+        }
+
+        .endpoint-list {
+            list-style: none;
+            margin-top: 0.5rem;
+        }
+
+        .endpoint-list li {
+            padding: 0.3rem 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Flask API Test Panel</h1>
+        <p class="subtitle">Send manual sensor data to test the Flask API</p>
+
+        <div class="info-box">
+            <strong>📍 API Server:</strong> http://127.0.0.1:5000<br>
+            <strong>📋 Endpoints:</strong>
+            <ul class="endpoint-list">
+                <li>POST /save_data - Save sensor data</li>
+                <li>GET /get_data - Retrieve data</li>
+                <li>GET /health - Health check</li>
+            </ul>
+        </div>
+
+        <!-- Health Check Section -->
+        <div class="section">
+            <h2>🏥 Health Check</h2>
+            <button class="btn-test" onclick="testHealth()">Test API Connection</button>
+        </div>
+
+        <!-- Manual Data Entry Section -->
+        <div class="section">
+            <h2>📤 Send Sensor Data</h2>
+            
+            <div class="preset-buttons">
+                <button class="preset-btn" onclick="setPreset('motion')">Motion Detected</button>
+                <button class="preset-btn" onclick="setPreset('no_motion')">No Motion</button>
+                <button class="preset-btn" onclick="setPreset('custom')">Clear</button>
+            </div>
+
+            <label for="motionStatus">Motion Status</label>
+            <select id="motionStatus">
+                <option value="MOTION DETECTED">MOTION DETECTED</option>
+                <option value="NO MOTION">NO MOTION</option>
+            </select>
+
+            <label for="radarStatus">Radar Status</label>
+            <select id="radarStatus">
+                <option value="RADAR ACTIVE">RADAR ACTIVE</option>
+                <option value="RADAR STANDBY">RADAR STANDBY</option>
+            </select>
+
+            <label for="temperature">Temperature (°C)</label>
+            <input type="number" id="temperature" value="25.5" step="0.1" placeholder="Enter temperature">
+
+            <label for="personDetected">Person Detected</label>
+            <select id="personDetected">
+                <option value="YES">YES</option>
+                <option value="NO">NO</option>
+            </select>
+
+            <div class="button-group">
+                <button class="btn-send" onclick="sendData()">Send Data</button>
+                <button class="btn-test" onclick="clearResponse()">Clear Response</button>
+            </div>
+        </div>
+
+        <!-- Get Data Section -->
+        <div class="section">
+            <h2>📥 Retrieve Data</h2>
+            <label for="recordLimit">Number of Records (1-100)</label>
+            <input type="number" id="recordLimit" value="10" min="1" max="100">
+            <button class="btn-send" onclick="getData()">Get Latest Records</button>
+        </div>
+
+        <!-- Status & Response -->
+        <div id="status" class="status"></div>
+        <div id="responseBox" class="response-box" style="display:none;"></div>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:5000';
+
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status show ${type}`;
+            statusDiv.textContent = message;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function showResponse(data) {
+            const responseBox = document.getElementById('responseBox');
+            responseBox.style.display = 'block';
+            responseBox.textContent = JSON.stringify(data, null, 2);
+        }
+
+        function clearResponse() {
+            document.getElementById('responseBox').style.display = 'none';
+        }
+
+        async function testHealth() {
+            showStatus('🔍 Testing API connection...', 'info');
+            try {
+                console.log('[API] Sending GET /health request...');
+                const response = await fetch(`${API_URL}/health`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+                console.log('[API] Response received:', data);
+
+                if (response.ok) {
+                    showStatus('✅ API Connection Successful! Database: ' + data.database, 'success');
+                    showResponse(data);
+                } else {
+                    showStatus('❌ API Error: ' + (data.message || 'Unknown error'), 'error');
+                    showResponse(data);
+                }
+            } catch (error) {
+                console.error('[API] Connection error:', error);
+                showStatus('❌ Cannot connect to Flask API. Make sure the server is running!', 'error');
+                showResponse({ error: error.message, hint: 'Run: python api_server.py' });
+            }
+        }
+
+        async function sendData() {
+            const motionStatus = document.getElementById('motionStatus').value;
+            const radarStatus = document.getElementById('radarStatus').value;
+            const temperature = document.getElementById('temperature').value;
+            const personDetected = document.getElementById('personDetected').value;
+
+            const payload = {
+                motion_status: motionStatus,
+                radar_status: radarStatus,
+                temperature: temperature,
+                person_detected: personDetected
+            };
+
+            showStatus('📤 Sending data to Flask API...', 'info');
+            console.log('[API] POST /save_data with payload:', payload);
+
+            try {
+                const response = await fetch(`${API_URL}/save_data`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                console.log('[API] Response received:', data);
+
+                if (data.success) {
+                    showStatus(`✅ Data saved successfully! Record ID: ${data.record_id}`, 'success');
+                    console.log('🗄️ [DATABASE] Record saved with ID:', data.record_id);
+                } else {
+                    showStatus(`❌ Failed to save: ${data.message}`, 'error');
+                }
+                showResponse(data);
+            } catch (error) {
+                console.error('[API] Send error:', error);
+                showStatus(`❌ Error: ${error.message}`, 'error');
+                showResponse({ error: error.message });
+            }
+        }
+
+        async function getData() {
+            const limit = document.getElementById('recordLimit').value;
+            showStatus('📥 Fetching data from database...', 'info');
+            console.log('[API] GET /get_data with limit:', limit);
+
+            try {
+                const response = await fetch(`${API_URL}/get_data?limit=${limit}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+                console.log('[API] Response received:', data);
+
+                if (data.success) {
+                    showStatus(`✅ Retrieved ${data.count} records from database`, 'success');
+                } else {
+                    showStatus(`❌ Failed to retrieve data: ${data.message}`, 'error');
+                }
+                showResponse(data);
+            } catch (error) {
+                console.error('[API] Fetch error:', error);
+                showStatus(`❌ Error: ${error.message}`, 'error');
+                showResponse({ error: error.message });
+            }
+        }
+
+        function setPreset(preset) {
+            if (preset === 'motion') {
+                document.getElementById('motionStatus').value = 'MOTION DETECTED';
+                document.getElementById('radarStatus').value = 'RADAR ACTIVE';
+                document.getElementById('personDetected').value = 'YES';
+                showStatus('✅ Motion Detected preset loaded', 'success');
+            } else if (preset === 'no_motion') {
+                document.getElementById('motionStatus').value = 'NO MOTION';
+                document.getElementById('radarStatus').value = 'RADAR STANDBY';
+                document.getElementById('personDetected').value = 'NO';
+                showStatus('✅ No Motion preset loaded', 'success');
+            } else if (preset === 'custom') {
+                document.getElementById('motionStatus').value = 'MOTION DETECTED';
+                document.getElementById('radarStatus').value = 'RADAR ACTIVE';
+                document.getElementById('personDetected').value = 'YES';
+                clearResponse();
+                showStatus('✅ Form cleared', 'info');
+            }
+        }
+
+        // Log page load
+        console.log('%c🧪 Flask API Test Panel Loaded', 'font-size: 14px; font-weight: bold; color: #667eea');
+        console.log('%cAPI Server: http://127.0.0.1:5000', 'font-size: 12px; color: #666');
+        console.log('%cOpen browser DevTools (F12) to see detailed logs', 'font-size: 11px; color: #999');
+    </script>
+</body>
+</html>

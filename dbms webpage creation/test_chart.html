@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chart.js Test</title>
+  <script src="chart.js"></script>
+</head>
+<body>
+  <h1>Chart.js Test</h1>
+  <canvas id="testChart" width="400" height="200"></canvas>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('Testing Chart.js...');
+
+      try {
+        const ctx = document.getElementById('testChart');
+        if (!ctx) {
+          console.error('Canvas element not found');
+          return;
+        }
+
+        const chart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
+            datasets: [{
+              label: 'Test Data',
+              data: [10, 20, 15, 25, 30],
+              borderColor: 'blue',
+              backgroundColor: 'rgba(0, 0, 255, 0.1)'
+            }]
+          }
+        });
+
+        console.log('Chart.js test successful!');
+        document.body.innerHTML += '<p style="color: green;">✅ Chart.js is working!</p>';
+
+      } catch (error) {
+        console.error('Chart.js test failed:', error);
+        document.body.innerHTML += '<p style="color: red;">❌ Chart.js error: ' + error.message + '</p>';
+      }
+    });
+  </script>
+</body>
+</html>

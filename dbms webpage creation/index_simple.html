@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Motion Dashboard - Dark Theme</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+
+        :root {
+            --background-dark: #0f0c29;
+            --text-light: #e0e0e0;
+            --card-bg: rgba(0, 0, 0, 0.4);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --glow-blue: #00c6ff;
+            --glow-purple: #928DFF;
+            --motion-detected: #ff4d6d;
+            --motion-none: #4dff94;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: url('https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1920&q=80') no-repeat center center fixed;
+            background-size: cover;
+            color: var(--text-light);
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, rgba(15, 12, 41, 0.8), rgba(0, 0, 0, 0.9));
+            z-index: -1;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: var(--card-bg);
+            border-radius: 20px;
+            border: 1px solid var(--card-border);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #fff;
+            text-shadow: 0 0 10px var(--glow-blue), 0 0 20px var(--glow-purple);
+        }
+
+        .subtitle {
+            font-size: 1rem;
+            color: var(--text-light);
+            opacity: 0.8;
+        }
+
+        .system-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .info-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1.5rem;
+            border-radius: 15px;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .info-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0 15px rgba(0, 198, 255, 0.3);
+        }
+
+        .info-label {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            opacity: 0.7;
+            margin-bottom: 0.5rem;
+        }
+
+        .info-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .connection-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        button {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            background: linear-gradient(45deg, var(--glow-blue), var(--glow-purple));
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 198, 255, 0.5);
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0, 198, 255, 0.8);
+        }
+
+        #disconnectBtn {
+            background: linear-gradient(45deg, #ff4d6d, #ff8fa3);
+            box-shadow: 0 0 10px rgba(255, 77, 109, 0.5);
+        }
+         #disconnectBtn:hover {
+            box-shadow: 0 0 20px rgba(255, 77, 109, 0.8);
+        }
+
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .status-disconnected {
+            background-color: #495057;
+            color: #f8f9fa;
+        }
+
+        .status-connected {
+            background-color: #28a745;
+            color: #fff;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .motion-display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            border-radius: 15px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            transition: all 0.3s ease;
+        }
+
+        .motion-display.not-detected {
+            color: var(--motion-none);
+            box-shadow: 0 0 20px var(--motion-none);
+        }
+
+        .motion-display.detected {
+            color: var(--motion-detected);
+            box-shadow: 0 0 20px var(--motion-detected);
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.02);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .chart-section, .debug-section, .location-section, .stats-section, .info-box {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin-bottom: 1.5rem;
+        }
+
+        h3 {
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: #fff;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 0.5rem;
+        }
+
+        #debugOutput {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            padding: 1rem;
+            height: 150px;
+            overflow-y: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+        
+        .info-box ul {
+            list-style-position: inside;
+        }
+        
+        @media (max-width: 992px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            .system-info {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+  <div class="container">
+    <audio id="alarmSound" src="https://www.soundjay.com/misc/sounds/beep-07a.mp3" preload="auto"></audio>
+    <div class="header">
+      <h1>ESP32 Advanced Motion Dashboard</h1>
+      <p class="subtitle">Real-Time Motion Detection & Location Tracking System</p>
+    </div>
+
+    <div class="system-info">
+      <div class="info-card">
+        <div class="info-label">System Status</div>
+        <div class="info-value" id="systemStatus">Ready</div>
+      </div>
+      <div class="info-card">
+        <div class="info-label">Uptime</div>
+        <div class="info-value" id="uptime">00:00:00</div>
+      </div>
+      <div class="info-card">
+        <div class="info-label">Last Motion</div>
+        <div class="info-value" id="lastMotion">--:--:--</div>
+      </div>
+      <div class="info-card">
+        <div class="info-label">Total Events</div>
+        <div class="info-value" id="totalEvents">0</div>
+      </div>
+    </div>
+
+    <div class="connection-controls">
+      <button id="connectBtn">Connect ESP32</button>
+      <button id="disconnectBtn">Disconnect</button>
+      <button id="getLocationBtn">Get Location</button>
+      <span class="status-badge status-disconnected" id="statusBadge">Disconnected</span>
+    </div>
+
+    <div class="main-content">
+        <div class="motion-display not-detected" id="motionDisplay">
+          <span class="motion-dot"></span>
+          <span class="status-text">NO MOTION</span>
+        </div>
+        <div class="location-section" id="locationSection">
+          <h3>Live Location</h3>
+          <div id="locationDisplay">Location not fetched</div>
+        </div>
+    </div>
+
+    <div class="chart-section">
+      <h3>Motion Activity Chart</h3>
+      <div class="chart-container" style="height:300px">
+        <canvas id="motionChart"></canvas>
+      </div>
+    </div>
+
+    <div class="debug-section">
+      <h3>Debug Output</h3>
+      <div id="debugOutput">Waiting for connection...</div>
+    </div>
+    
+    <div class="info-box">
+      <h3>Advanced Features</h3>
+      <ul>
+        <li>Real-time motion detection with visual feedback</li>
+        <li>GPS location tracking on motion events</li>
+        <li>Live statistics and performance metrics</li>
+        <li>Interactive charts with motion history</li>
+        <li>Responsive design for all devices</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // ==================== FLASK API CONFIGURATION ====================
+      const FLASK_API_URL = 'http://127.0.0.1:5000';
+      const SAVE_DATA_ENDPOINT = `${FLASK_API_URL}/save_data`;
+      const HEALTH_CHECK_ENDPOINT = `${FLASK_API_URL}/health`;
+      const GET_DATA_ENDPOINT = `${FLASK_API_URL}/get_data`;
+      
+      let apiConnected = false;
+      let currentTemperature = 0;
+      
+      // Test API connection on load
+      const testAPIConnection = async () => {
+        try {
+          console.log('[API] Testing Flask server connection...');
+          const response = await fetch(HEALTH_CHECK_ENDPOINT, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            apiConnected = true;
+            console.log('✅ [API] Flask server connected successfully!');
+            console.log('🗄️  [API] Database status:', data.database);
+            addDebug('✅ Flask API connected - MySQL database ready');
+          } else {
+            apiConnected = false;
+            console.warn('⚠️ [API] Flask server responded with error:', response.status);
+            addDebug('⚠️ Flask API error - Check server logs');
+          }
+        } catch (error) {
+          apiConnected = false;
+          console.error('❌ [API] Cannot connect to Flask server:', error.message);
+          console.log('💡 [API] Make sure:');
+          console.log('   1. Flask server is running: python api_server.py');
+          console.log('   2. XAMPP MySQL is running');
+          console.log('   3. Database "human_detection" and table "detection" exist');
+          addDebug('❌ Flask API unavailable - Run: python api_server.py');
+        }
+      };
+      
+      // Send sensor data to Flask API
+      const sendSensorDataToAPI = async (motionStatus, radarStatus, temperature, personDetected) => {
+        if (!apiConnected) {
+          console.warn('⚠️ [API] API not connected, skipping data save');
+          return false;
+        }
+        
+        try {
+          // Prepare payload with correct format
+          const payload = {
+            motion_status: motionStatus,
+            radar_status: radarStatus,
+            temperature: temperature.toString(),
+            person_detected: personDetected
+          };
+          
+          console.log('[API] Sending data to /save_data:', payload);
+          addDebug(`📤 Sending data: ${JSON.stringify(payload)}`);
+          
+          const response = await fetch(SAVE_DATA_ENDPOINT, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+          
+          const data = await response.json();
+          
+          if (response.ok && data.success) {
+            console.log('✅ [API] Data saved successfully!');
+            console.log('   Record ID:', data.record_id);
+            console.log('   Timestamp:', data.timestamp);
+            addDebug(`💾 ✅ Data saved to database (Record ID: ${data.record_id})`);
+            return true;
+          } else {
+            console.error('❌ [API] Failed to save data:', data.message);
+            addDebug(`❌ Save failed: ${data.message}`);
+            return false;
+          }
+        } catch (error) {
+          console.error('❌ [API] Error sending data:', error.message);
+          console.error('   Full error:', error);
+          addDebug(`❌ Error: ${error.message}`);
+          return false;
+        }
+      };
+      
+      // ==================== END FLASK API CONFIGURATION ====================
+      
+      let port = null;
+      let reader = null;
+      let isConnected = false;
+      let liveLatitude = '--';
+      let liveLongitude = '--';
+
+      // Statistics tracking
+      let motionCount = 0;
+      let totalEvents = 0;
+      let locationUpdates = 0;
+      let lastMotionTime = null;
+      let motionIntervals = [];
+      let startTime = Date.now();
+      let chart = null;
+      let motionData = [];
+      let timeLabels = [];
+
+      // Safe element getter
+      const safeGet = (id) => {
+        const elem = document.getElementById(id);
+        if (!elem) {
+          console.warn(`Element with id "${id}" not found`);
+        }
+        return elem;
+      };
+
+      // Format time helper
+      const formatTime = (date) => {
+        return date.toLocaleTimeString();
+      };
+
+      // Format uptime
+      const formatUptime = (milliseconds) => {
+        const totalSeconds = Math.floor(milliseconds / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      };
+
+      // Update uptime display
+      const updateUptime = () => {
+        const uptimeElem = safeGet('uptime');
+        if (uptimeElem) {
+          uptimeElem.textContent = formatUptime(Date.now() - startTime);
+        }
+      };
+
+      // Update statistics
+      const updateStatistics = () => {
+        const motionCountElem = safeGet('motionCount');
+        const totalEventsElem = safeGet('totalEvents');
+        const locationUpdatesElem = safeGet('locationUpdates');
+        const avgIntervalElem = safeGet('avgInterval');
+        const accuracyRateElem = safeGet('accuracyRate');
+
+        if (motionCountElem) motionCountElem.textContent = motionCount;
+        if (totalEventsElem) totalEventsElem.textContent = totalEvents;
+        if (locationUpdatesElem) locationUpdatesElem.textContent = locationUpdates;
+
+        // Calculate average interval
+        if (motionIntervals.length > 1) {
+          const avgInterval = motionIntervals.reduce((a, b) => a + b, 0) / motionIntervals.length;
+          const avgMinutes = Math.floor(avgInterval / 60000);
+          const avgSeconds = Math.floor((avgInterval % 60000) / 1000);
+          if (avgIntervalElem) avgIntervalElem.textContent = `${avgMinutes}m ${avgSeconds}s`;
+        } else {
+          if (avgIntervalElem) avgIntervalElem.textContent = '--';
+        }
+
+        // Calculate accuracy rate (assuming all detections are accurate for now)
+        const accuracy = totalEvents > 0 ? Math.round((motionCount / totalEvents) * 100) : 100;
+        if (accuracyRateElem) accuracyRateElem.textContent = `${accuracy}%`;
+      };
+
+      // Initialize Chart.js
+      const initChart = () => {
+        const ctx = safeGet('motionChart');
+        if (!ctx) return;
+
+        chart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: timeLabels,
+            datasets: [{
+              label: 'Motion Activity',
+              data: motionData,
+              borderColor: 'rgba(0, 198, 255, 1)',
+              backgroundColor: 'rgba(0, 198, 255, 0.2)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.4,
+              pointBackgroundColor: '#fff',
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                ticks: { color: 'white' },
+                grid: { color: 'rgba(255, 255, 255, 0.1)' }
+              },
+              y: {
+                beginAtZero: true,
+                ticks: { color: 'white' },
+                grid: { color: 'rgba(255, 255, 255, 0.1)' }
+              }
+            },
+            plugins: {
+                legend: {
+                    labels: {
+                        color: 'white'
+                    }
+                }
+            }
+          }
+        });
+      };
+
+      // Update chart with new data
+      const updateChart = (motionDetected) => {
+        if (!chart) return;
+
+        const now = new Date();
+        const timeLabel = now.toLocaleTimeString();
+
+        // Add new data point
+        timeLabels.push(timeLabel);
+        motionData.push(motionDetected ? 1 : 0);
+
+        // Keep only last 20 data points
+        if (timeLabels.length > 20) {
+          timeLabels.shift();
+          motionData.shift();
+        }
+
+        chart.update();
+      };
+
+      // Debug output helper
+      const addDebug = (message) => {
+        const debugOutput = safeGet('debugOutput');
+        if (!debugOutput) return;
+
+        const timestamp = new Date().toLocaleTimeString();
+        const entry = `[${timestamp}] ${message}`;
+        debugOutput.innerHTML = `${entry}<br>${debugOutput.innerHTML}`;
+        
+        const lines = debugOutput.innerHTML.split('<br>');
+        if (lines.length > 20) {
+          debugOutput.innerHTML = lines.slice(0, 20).join('<br>');
+        }
+      };
+
+      // Update system status
+      const updateSystemStatus = (status) => {
+        const statusElem = safeGet('systemStatus');
+        if (statusElem) {
+          statusElem.textContent = status;
+        }
+      };
+      
+      const playAlarmSound = () => {
+        const alarmSound = safeGet('alarmSound');
+        if (alarmSound) {
+          alarmSound.currentTime = 0; // Reset to start
+          alarmSound.play().catch(e => console.warn('Audio play failed:', e));
+        }
+      };
+
+      const showNotification = () => {
+        if (Notification.permission === 'granted') {
+          new Notification('Motion Detected!', {
+            body: 'Movement detected in monitored area',
+            icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJDMTMuMSAyIDE0IDIuOSAxNCA0VjE2QzE0IDE3LjEgMTMuMSAxOCA5IDE4QzQuOSAxOCA0IDE3LjEgNCAxNlY0QzQgMi45IDQuOSAyIDYgMkgxOEMxOC45IDIgMjAgMi45IDIwIDRWMTZDMTggMTYuMSAxNy4xIDE2IDE2IDE2VjRDMTYgMi45IDE3LjEgMiAxOCAySDEyWk0xMiAyMUMxMy4xIDIxIDE0IDIxLjkgMTQgMjNIMTBMMTAuNSAyMy4xQzEwLjggMjMuNCAxMS4yIDIzLjQgMTEuNSAyMy4xTDEyIDIxWiIgc3Ryb2tlPSIjZmY0ZjZkIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8L3N2Zz4K'
+          });
+        }
+      };
+
+      // Update motion display
+      const updateMotionDisplay = (isMotion) => {
+        const display = safeGet('motionDisplay');
+        const lastMotionElem = safeGet('lastMotion');
+        if (!display) return;
+
+        const dot = display.querySelector('.motion-dot');
+        const statusText = display.querySelector('.status-text');
+
+        totalEvents++;
+
+        if (isMotion) {
+          motionCount++;
+          playAlarmSound();
+          showNotification();
+          display.className = 'motion-display detected';
+          if(dot) dot.className = 'motion-dot alert';
+          if(statusText) statusText.textContent = 'MOTION DETECTED';
+          
+          const now = new Date();
+          if(lastMotionElem) lastMotionElem.textContent = formatTime(now);
+
+          if (lastMotionTime) {
+            const interval = now - lastMotionTime;
+            motionIntervals.push(interval);
+            if (motionIntervals.length > 10) motionIntervals.shift();
+          }
+          lastMotionTime = now;
+          
+          addDebug('✅ Motion Detected');
+          
+          // Send motion data to Flask API
+          sendSensorDataToAPI(
+            'MOTION DETECTED',      // motion_status
+            'RADAR ACTIVE',         // radar_status
+            currentTemperature,     // temperature
+            'YES'                   // person_detected
+          );
+          
+          getLocation();
+        } else {
+          display.className = 'motion-display not-detected';
+           if(dot) dot.className = 'motion-dot';
+          if(statusText) statusText.textContent = 'NO MOTION';
+          addDebug('❌ No Motion');
+          
+          // Send no motion data to Flask API
+          sendSensorDataToAPI(
+            'NO MOTION',            // motion_status
+            'RADAR STANDBY',        // radar_status
+            currentTemperature,     // temperature
+            'NO'                    // person_detected
+          );
+        }
+        
+        updateStatistics();
+        updateChart(isMotion);
+      };
+
+      // Geolocation function
+      const getLocation = () => {
+        const locationDisplay = safeGet('locationDisplay');
+        if (!navigator.geolocation) {
+          locationDisplay.textContent = 'Geolocation not supported';
+          addDebug('Geolocation not supported');
+          return;
+        }
+
+        locationDisplay.textContent = 'Fetching location...';
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            liveLatitude = position.coords.latitude.toFixed(6);
+            liveLongitude = position.coords.longitude.toFixed(6);
+            locationDisplay.innerHTML = `Lat: ${liveLatitude}, Lon: ${liveLongitude} <br><a href="https://www.google.com/maps?q=${liveLatitude},${liveLongitude}" target="_blank">View on Map</a>`;
+            locationUpdates++;
+            updateStatistics();
+            addDebug(`📍 Location: ${liveLatitude}, ${liveLongitude}`);
+            console.log('[GPS] Location obtained:', { latitude: liveLatitude, longitude: liveLongitude });
+          },
+          (error) => {
+            locationDisplay.textContent = `Error: ${error.message}`;
+            addDebug(`❌ Location error: ${error.message}`);
+            console.warn('[GPS] Location error:', error);
+          }
+        );
+      };
+
+      // Update connection status
+      const updateConnectionStatus = (connected) => {
+        isConnected = connected;
+        const badge = safeGet('statusBadge');
+        const connectBtn = safeGet('connectBtn');
+        const disconnectBtn = safeGet('disconnectBtn');
+
+        if (!badge || !connectBtn || !disconnectBtn) return;
+
+        if (connected) {
+          badge.className = 'status-badge status-connected';
+          badge.textContent = 'Connected';
+          connectBtn.style.display = 'none';
+          disconnectBtn.style.display = 'inline-block';
+          updateSystemStatus('Connected');
+          addDebug('✅ Connected to ESP32');
+        } else {
+          badge.className = 'status-badge status-disconnected';
+          badge.textContent = 'Disconnected';
+          connectBtn.style.display = 'inline-block';
+          disconnectBtn.style.display = 'none';
+          updateSystemStatus('Disconnected');
+          addDebug('⚪ Disconnected from ESP32');
+        }
+      };
+      
+      // Parse serial data
+      const parseLine = (line) => {
+        const norm = line.trim().toLowerCase();
+        if (!norm) return;
+
+        console.log(`[PARSE] "${norm}"`);
+
+        // Check for temperature data (e.g., "temp:32.5" or "temperature:32.5")
+        const tempMatch = norm.match(/temp(?:erature)?[:\s=]+([0-9.]+)/);
+        if (tempMatch) {
+          currentTemperature = parseFloat(tempMatch[1]);
+          console.log('[TEMP] Temperature updated:', currentTemperature);
+          addDebug(`🌡️ Temperature: ${currentTemperature}°C`);
+          return;
+        }
+
+        // Check for motion detection messages
+        if (norm.includes('motion detected') || norm.includes('motion') && norm.includes('on')) {
+          updateMotionDisplay(true);
+          return;
+        }
+
+        if (norm.includes('no person detected') || norm === 'no motion' || (norm.includes('motion') && norm.includes('off'))) {
+          updateMotionDisplay(false);
+          return;
+        }
+
+        // Generic ON/OFF parsing
+        if (norm === 'on' || norm === '1' || norm === 'true') {
+          updateMotionDisplay(true);
+          return;
+        }
+
+        if (norm === 'off' || norm === '0' || norm === 'false') {
+          updateMotionDisplay(false);
+          return;
+        }
+      };
+
+      // Connect to ESP32
+      const connectSerial = async () => {
+        if (!('serial' in navigator)) {
+          addDebug('❌ Web Serial API not supported');
+          alert('Web Serial API not supported.\nPlease use Chrome, Edge, or Opera browser.');
+          console.error('Web Serial not available');
+          return;
+        }
+
+        try {
+          addDebug('📋 Requesting serial port...');
+          console.log('Requesting port...');
+
+          port = await navigator.serial.requestPort().catch((error) => {
+            if (error.name === 'NotFoundError' || error.name === 'WrongOperand') {
+              addDebug('❌ No ESP32 found or port selection cancelled');
+              alert('Please:\n1. Connect ESP32 via USB\n2. Try again and select the port\n3. Grant permission if prompted');
+              return null;
+            }
+            throw error;
+          });
+
+          if (!port) {
+            addDebug('⚠️ Port selection cancelled');
+            return;
+          }
+
+          addDebug('🔌 Opening port at 115200 baud...');
+          console.log('Opening port...');
+
+          await port.open({ baudRate: 115200 }).catch((error) => {
+            addDebug(`❌ Failed to open port: ${error.message}`);
+            alert(`Failed to open port:\n${error.message}\n\nTroubleshooting:\n- Check USB connection\n- Install CH340 drivers\n- Close other serial programs`);
+            throw error;
+          });
+
+          updateConnectionStatus(true);
+
+          // Set up readable stream
+          const decoder = new TextDecoderStream();
+          port.readable.pipeTo(decoder.writable);
+          reader = decoder.readable.getReader();
+
+          addDebug('📡 Ready to receive data...');
+          let buffer = '';
+
+          // Read loop
+          while (true) {
+            try {
+              const { value, done } = await reader.read();
+
+              if (done) {
+                console.log('Reader closed');
+                break;
+              }
+
+              if (!value) continue;
+
+              buffer += value;
+
+              // Process complete lines
+              const lines = buffer.split(/\r?\n/);
+              buffer = lines.pop() || '';
+
+              for (const rawLine of lines) {
+                const line = rawLine.trim();
+                if (!line) continue;
+
+                console.log(`📥 RECEIVED: "${line}"`);
+                addDebug(`📥 "${line}"`);
+                parseLine(line);
+              }
+            } catch (readError) {
+              if (readError.name === 'NotReadableError') {
+                console.log('Port disconnected');
+                addDebug('⚠️ Port disconnected');
+              } else {
+                console.error('Read error:', readError);
+                addDebug(`❌ Read error: ${readError.message}`);
+              }
+              break;
+            }
+          }
+        } catch (error) {
+          console.error('Connection error:', error);
+          addDebug(`❌ ERROR: ${error?.message || error}`);
+          updateConnectionStatus(false);
+
+          // Cleanup
+          if (reader) {
+            await reader.cancel().catch(() => {});
+            reader = null;
+          }
+          if (port) {
+            await port.close().catch(() => {});
+            port = null;
+          }
+        }
+      };
+
+      // Disconnect from ESP32
+      const disconnectSerial = async () => {
+        console.log('Disconnecting...');
+        addDebug('Disconnecting...');
+
+        try {
+          if (reader) {
+            await reader.cancel().catch((e) => console.warn('Cancel error:', e));
+            reader = null;
+          }
+
+          if (port) {
+            await port.close().catch((e) => console.warn('Close error:', e));
+            port = null;
+          }
+
+          updateConnectionStatus(false);
+          addDebug('✅ Disconnected');
+        } catch (error) {
+          console.error('Disconnect error:', error);
+          addDebug(`⚠️ Disconnect error: ${error.message}`);
+          updateConnectionStatus(false);
+        }
+      };
+
+
+      // Initialize
+      console.log('='.repeat(60));
+      console.log('🚀 ESP32 Advanced Motion Detection Dashboard');
+      console.log('='.repeat(60));
+      console.log('📍 API Endpoint:', SAVE_DATA_ENDPOINT);
+      console.log('🔍 Health Check:', HEALTH_CHECK_ENDPOINT);
+      console.log('📊 Get Data:', GET_DATA_ENDPOINT);
+      console.log('='.repeat(60));
+      
+      initChart();
+      updateStatistics();
+      updateConnectionStatus(false);
+      testAPIConnection();  // Test Flask API connection
+      
+      setInterval(updateUptime, 1000);
+      
+      const connectBtn = safeGet('connectBtn');
+      const disconnectBtn = safeGet('disconnectBtn');
+      const getLocationBtn = safeGet('getLocationBtn');
+      
+      if (connectBtn) connectBtn.addEventListener('click', connectSerial);
+      if (disconnectBtn) disconnectBtn.addEventListener('click', disconnectSerial);
+      if (getLocationBtn) getLocationBtn.addEventListener('click', getLocation);
+
+      if ('Notification' in window) {
+        Notification.requestPermission();
+      }
+
+      addDebug('Dashboard ready.');
+      console.log('✅ Dashboard initialization complete');
+    });
+  </script>
+</body>
+</html> 
